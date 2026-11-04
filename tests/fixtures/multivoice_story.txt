@@ -1,0 +1,15 @@
+# Original synthetic test dialogue; no third-party book text.
+[narrator]
+Mr. Fox walked into the garden.
+
+[fox]
+Can you help me?
+
+[narrator:tag]
+asked Mr. Fox.
+
+[bird]
+Of course!
+
+[narrator]
+The little bird flew away.

@@ -1,0 +1,28 @@
+# Environment and build artifacts
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.coverage
+htmlcov/
+
+# Locally supplied story texts and original demo (do not publish by default)
+local_samples/
+
+# Generated / private audio assets
+*.mp3
+*.m4b
+*.wav
+*.flac
+*.partial
+*.partial.*
+.voxbraid_cache/
+.multivoice_cache/
+.env
+.env.*
+!.env.example
