@@ -2,70 +2,105 @@
 
 **Weave voices into stories.**
 
-VoxBraid is a planned modular, multi-voice text-to-audio toolkit. Its **only source format is
-prepared UTF-8 TXT**, optionally annotated with speaker labels. OCR, PDF/EPUB extraction,
-cleanup and AI speaker identification happen **before** VoxBraid, outside this repository.
+VoxBraid is a modular TXT-to-audio project with multi-character narration and future
+per-character TTS providers. Only **prepared UTF-8 TXT** belongs in this repository.
+OCR, PDF/EPUB extraction, text cleanup and AI speaker identification are separate
+upstream tasks.
 
-> **Current state: M0 scaffold (version 0.0.1).** The package installs and provides a working
-> `voxbraid` CLI for help, version and environment diagnostics. **It cannot synthesize audio
-> yet.** `preview` starts in M1; `render` starts later. The Rapunzel legacy demo is supplied
-> separately under ignored `local_samples/` for personal comparison.
+> **M1 checkpoint — v0.0.2.** `voxbraid preview` parses TXT, identifies sentence and
+> paragraph boundaries, labels roles, and plans pauses **fully offline**. The `render`
+> command is **not implemented yet**; audio generation starts in a later milestone.
 
-## Quick start
+## Install and test (Arch Linux + pyenv)
 
-### Arch Linux / Linux
+In your existing `voxbraid` repository and pyenv environment:
 
 ```bash
-cd voxbraid_m0  # Or the directory into which you extracted the ZIP
-python -m venv .venv
-source .venv/bin/activate
+cd ~/Downloads/projects/voxbraid
+pyenv version
 python -m pip install -e '.[dev]'
-voxbraid --help
+pyenv rehash
 voxbraid --version
 voxbraid doctor
 python -m pytest -q
+python -m ruff check .
 ```
 
-### Windows (PowerShell)
+If you are **updating from M0**, extract the M1 update ZIP at the **root of the
+existing repository**. It adds or replaces only project code, tests and documentation.
+It does not touch `.git`, `.python-version`, your virtual environment or ignored
+`local_samples/`.
 
-```powershell
-py -3 -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
-voxbraid --help
-voxbraid doctor
-python -m pytest -q
+On Windows, use a normal Python 3.10+ environment and the same `pip install -e ".[dev]"`.
+
+## M1 preview (no synthesis / no internet)
+
+Plain narration TXT:
+
+```bash
+voxbraid preview tests/fixtures/plain_story.txt
 ```
 
-`python -m voxbraid --help` also works if you prefer not to use the installed console script.
+Tagged multiple-speaker TXT:
 
-`voxbraid doctor` checks for Python and the available `ffmpeg`, `ffprobe` and `edge-tts`
-executables. Missing tools do not fail M0: synthesis has not been implemented yet.
+```bash
+voxbraid preview tests/fixtures/multivoice_story.txt
+```
 
-## Scope and design invariants
+The original Rapunzel demo from M0 (if kept under `local_samples/`):
 
-- **Input:** prepared UTF-8 TXT only. Plain narration and manually tagged multiple voices.
-- **Provider-neutral:** the future voice assignment is per character/segment, not per book.
-- **M1 parser:** preserve paragraph boundaries and validate speaker tags; no AI/NLP.
-- **M2+ speech:** Edge TTS adapter first; allow optional providers without mandatory heavy deps.
-- **Reliability:** retry transient failures, validate cached audio, resume interrupted jobs.
-- **Composer:** sentence vs paragraph vs dialogue pauses; optional music and fades.
-- **Re-render:** editing music/pauses must not call TTS again if speech is cached.
-- **Cross-platform:** Python 3.10+; no Arch-specific commands in package logic.
+```bash
+voxbraid preview local_samples/rapunzel_legacy/rapunzel_dialogue.txt --limit 20
+```
 
-## Repo structure
+The M1 planner produces 77 segments from that Rapunzel source; it does **not**
+produce audio or call any provider. The count is a regression check, not a guarantee
+of perfect sentence detection for arbitrary texts.
+
+Tune pause settings without modifying the TXT:
+
+```bash
+voxbraid preview tests/fixtures/plain_story.txt \
+  --intro 3 \
+  --sentence-gap 1.5 \
+  --paragraph-gap 3 \
+  --speaker-gap 1 \
+  --attribution-gap 0.4 \
+  --lead-gap 0.6
+```
+
+Export a machine-readable preview for inspection:
+
+```bash
+voxbraid preview tests/fixtures/multivoice_story.txt --json
+```
+
+See [the input format specification](docs/text_format.md) for role markers,
+paragraph conventions, pause precedence, quote handling and limitations.
+
+## Repository scope and structure
 
 ```text
-src/voxbraid/           Installable Python package (CLI + diagnostics in M0)
-tests/                  Automated tests without internet access
-tests/fixtures/         Original synthetic TXT fixtures
-docs/roadmap.md         Milestones, acceptance criteria, and checkpoints
-local_samples/          Ignored local-only Rapunzel benchmark and old script
+src/voxbraid/
+    cli.py          Preview/doctor entry point
+    parser.py       TXT and role parsing
+    models.py       Provider-independent document and segment models
+    planner.py      Sentence splitting and pause planning
+    diagnostics.py  External tool checks
+
+tests/              Offline pytest regression suite
+tests/fixtures/     Original synthetic test data
+docs/roadmap.md     Milestone plan and checkpoint log
+docs/text_format.md User-facing TXT rules
+local_samples/      Git-ignored legacy demo kept for local listening comparison
 ```
 
-`local_samples/` is **excluded from Git by default** because the demo contains a retelling
-from a source book; review rights before sharing. No audio cache, generated MP3 or model
-artifacts should be committed.
+**Future:** M2 provider abstraction + Edge TTS, M3 retry/resume/cache, M4 audio
+composer with music, M5 configuration and CLI polishing, M6 integration and release.
+Optional providers such as Kokoro/ElevenLabs will not be compulsory dependencies.
+
+`local_samples/` is intentionally excluded from Git: do not accidentally publish
+full book text or personal audio. Audio caches and generated MP3 files are also ignored.
 
 ## Development
 
@@ -74,6 +109,4 @@ python -m pytest -q
 python -m ruff check .
 ```
 
-See [docs/roadmap.md](docs/roadmap.md) for the next milestones and their exit criteria.
-
-**License:** Not chosen yet. Select a license before publishing this as a public repo.
+**License:** not selected yet. Decide before making the repository public.

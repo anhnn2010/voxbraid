@@ -1,0 +1,16 @@
+# Original demo dialogue written for VoxBraid
+[narrator]
+The fox was walking through the forest.
+He saw a little bird in a tree.
+
+[fox]
+“Hello! Can you help me find my way home?”
+
+[narrator:tag]
+asked the fox.
+
+[bird]
+“Of course!”
+
+[narrator]
+They walked home together.

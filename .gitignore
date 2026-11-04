@@ -1,5 +1,7 @@
 # Environment and build artifacts
 .venv/
+# Local pyenv environment name
+.python-version
 venv/
 __pycache__/
 *.py[cod]
@@ -26,3 +28,4 @@ local_samples/
 .env
 .env.*
 !.env.example
+.idea/

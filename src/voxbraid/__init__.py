@@ -1,3 +1,3 @@
-"""VoxBraid: prepared text to multi-voice audiobook (M0 scaffold)."""
+"""VoxBraid: prepared TXT to multi-voice audiobook (M1 text planning)."""
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
