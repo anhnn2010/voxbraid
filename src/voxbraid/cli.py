@@ -231,7 +231,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         for check in collect_diagnostics():
             status = "OK" if check.available else "MISSING"
             print(f"[{status}] {check.name}: {check.detail}")
-        print("M5: render TXT -> MP3; compose remains offline.")
+        print("Render: TXT -> MP3; compose works offline without a TTS provider.")
         return 0
     if args.command == "render":
         return _render(args, parser)

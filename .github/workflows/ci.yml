@@ -5,19 +5,47 @@ on:
   pull_request:
 
 jobs:
-  unit-tests:
+  unit-and-audio-integration:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2022]
         python-version: ['3.10', '3.12']
     runs-on: ${{ matrix.os }}
+    env:
+      PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install -e ".[dev]"
-      - run: python -m pytest -q
-      - run: python -m ruff check .
-      - run: python -m voxbraid --help
+      # The integration tests must actually run on both operating systems.
+      # Do not let "pytest skip" conceal missing FFmpeg/FFprobe on the runner.
+      - name: Install FFmpeg (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - name: Install FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install ffmpeg --yes --no-progress
+      - name: Verify required audio tools
+        shell: bash
+        run: |
+          ffmpeg -version
+          ffprobe -version
+      - name: Install VoxBraid and test dependencies
+        run: python -m pip install -e ".[dev,edge]"
+      - name: Offline unit tests and audio integration
+        run: python -m pytest -q
+      - name: Ruff
+        run: python -m ruff check .
+      - name: Package wheel
+        run: python -m pip wheel --no-deps --no-build-isolation . -w dist
+      - name: CLI smoke test
+        run: |
+          python -m voxbraid --help
+          python -m voxbraid --version
+          python -m voxbraid preview tests/fixtures/plain_story.txt --limit 2

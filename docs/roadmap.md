@@ -86,12 +86,20 @@ python -m ruff check .
 - `--music` file/folder and `--music-seed` retain M4 behavior and gain `0.04`.
 - PyYAML is a small required core dependency. Edge is still an optional adapter.
 
-## M6 — Integration and packaging
+## M6 — Integration and packaging (v0.0.7 candidate)
 
-- Full Rapunzel audio listening regression against the original demo.
-- Tests for dialogue, resume, cache and corrupted audio.
-- Arch Linux and Windows smoke tests, README and packaging review.
-- Choose release license before public publication.
+- Three new **mandatory** offline real-audio end-to-end tests, using two
+  mock providers to generate WAV and MP3 inside a single book.
+- Cross-provider rendering + cache reuse + pause-only recomposition +
+  seed-stable directory music + selective role voice invalidation.
+- Corrupt music must not overwrite an existing valid final MP3.
+- CI matrix: Ubuntu 24.04 and Windows Server 2022 with Python 3.10 and 3.12;
+  install/verify FFmpeg + FFprobe explicitly so audio integration never skips.
+- Build a wheel in CI; document pyenv/Arch manual acceptance and Rapunzel
+  listening regression before tagging any stable release.
+- **Pending (not claimed complete):** user Arch acceptance, actual Windows CI
+  run, real Edge online smoke, and choice of release license before publishing.
+- See `docs/m6_release.md` for exact commands and acceptance checklist.
 
 ## Design decision log
 
@@ -109,3 +117,5 @@ python -m ruff check .
 - 2026-11-05: M4 directory music chooses one random MP3 (non-recursive) and loops that track; an explicit file never randomizes.
 
 - 2026-11-05: M5 adds one-command render, installed bedtime preset, YAML/JSON book configuration.
+
+- 2026-11-05: M6 enhances offline audio regression and cross-platform CI; release remains candidate pending manual acceptance and license.

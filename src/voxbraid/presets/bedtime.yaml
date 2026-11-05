@@ -2,8 +2,8 @@
 version: 1
 pauses:
   intro: 3.0
-  sentence: 1.5
-  paragraph: 3.0
+  sentence: 5.0
+  paragraph: 5.0
   speaker: 1.0
   attribution: 0.4
   lead: 0.6

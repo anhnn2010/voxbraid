@@ -1,3 +1,3 @@
-"""VoxBraid: modular prepared-TXT-to-audio engine (M4 audio composition)."""
+"""VoxBraid: modular prepared-TXT-to-audio engine."""
 
-__version__ = "0.0.6"
+__version__ = "0.0.7"

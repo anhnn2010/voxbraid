@@ -8,28 +8,38 @@ pauses, optional Baroque music, and repeatable synthesis with retry and cache.
 TXT extraction, OCR, EPUB/PDF processing and AI character detection are
 **deliberately outside this repository**.
 
-> **M5 checkpoint — v0.0.6.** `voxbraid render` can now run the complete
-> TXT → speech clips → MP3 pipeline in one command. `preview`, `synthesize`,
-> and `compose` remain separate commands. Only the **Edge TTS provider** is
-> implemented today; the registry supports future providers per character.
+> **M6 release candidate — v0.0.7.** This milestone adds an offline,
+> real-audio, mixed-provider end-to-end regression suite; release checks and
+> Windows/Linux CI with FFmpeg installed explicitly. It does **not** add new
+> cloud providers or alter the M5 synthesis/compose interface. `render`,
+> `preview`, `synthesize` and `compose` are available; the only built-in
+> TTS adapter today is **Edge TTS**.
 
-## Upgrade M4 → M5 (Arch Linux + pyenv)
+## Upgrade M5 → M6 (Arch Linux + pyenv)
 
-Extract the M5 incremental ZIP over the existing Git checkout. It does not
-include `.git`, `.python-version`, personal story files or generated audio.
+After committing M5, extract the M6 update into the existing Git checkout.
+The incremental ZIP does not contain `.git`, `.python-version`, personal story
+files, any TTS cache or generated audio.
 
 ```bash
 cd ~/Downloads/projects/voxbraid
-unzip -o ~/Downloads/voxbraid_M5_update.zip -d .
+unzip -o ~/Downloads/voxbraid_M6_update.zip -d .
 python -m pip install -e '.[dev,edge]'
 pyenv rehash
-voxbraid --version         # 0.0.6
+voxbraid --version         # 0.0.7
 python -m pytest -q
 python -m ruff check .
 ```
 
-FFmpeg and FFprobe must be installed and available on `PATH`. Edge TTS is
-online; `compose` and `render --dry-run` do not contact Microsoft.
+FFmpeg and FFprobe are required for synthesis validation and final rendering:
+`sudo pacman -S ffmpeg` if they are missing. Edge TTS is online; `compose`,
+`preview` and `render --dry-run` do not make TTS requests. The M6 regression
+suite itself runs fully **offline** using synthetic speech audio.
+
+**Release status:** Candidate for your Arch Linux acceptance, **not** a public
+v1.0.0 release yet. The Windows runner and live Rapunzel listening tests still
+need their own confirmation. A public-release license is not yet selected;
+see [docs/m6_release.md](docs/m6_release.md).
 
 ## Single-command render
 
@@ -69,7 +79,7 @@ voxbraid render examples/forest_dialogue.txt \
 **Music rules:** `--music file.mp3` uses exactly that file; a directory
 randomly selects **one direct-child MP3** and loops it throughout the story.
 `--music-seed` makes folder selection reproducible, but is optional. A file
-without a music argument results in speech-only MP3. Existing M4 `compose`
+without a music argument results in speech-only MP3. The established `compose`
 behavior is unchanged, including 2s/5s music fades and the default 0.04
 background gain. `--no-music` ignores music in the book config.
 
@@ -141,7 +151,7 @@ Use it with `--config book.yaml`. You may also supply a standalone
 **role-to-voice** JSON *or* YAML with `--voices voices.yaml`. `--voices`
 **replaces** the book's entire voice mapping; the program does not silently
 assign an unknown character the narrator's voice. A book can assign distinct
-providers per role, but only `edge` has an implemented adapter in M5.
+providers per role, but only `edge` has an implemented adapter in VoxBraid.
 
 **Configuration priority:** built-in defaults < `--preset bedtime` (or a
 custom YAML/JSON preset path) < `--config` book config < explicit CLI flags.
@@ -166,7 +176,7 @@ voxbraid compose local_samples/forest_m5/manifest.json \
 voxbraid preview examples/forest_dialogue.txt --limit 20
 ```
 
-The M4 composer takes native speech clips and converts them to streamed
+The composer takes native speech clips and converts them to streamed
 48-kHz stereo PCM before exporting MP3. Separate sentence, paragraph,
 speaker, attribution, and lead pauses are kept in the manifest. No
 AI/NLP dependency, voice cloning or audio ducking is required.
@@ -175,7 +185,8 @@ AI/NLP dependency, voice cloning or audio ducking is required.
 
 - **M0–M4:** foundation, parser/planner, Edge adapter, retry/cache, composer.
 - **M5:** one-command `render`, configuration/presets, YAML voice profiles.
-- **M6:** Arch/Windows smoke tests, Rapunzel listening regression, release review.
+- **M6:** offline mixed-format integration tests and cross-platform CI setup;
+  Arch/Windows acceptance and Rapunzel listening check are pending.
 
 The original Rapunzel story and demo remain local under `local_samples/`
 and must not be committed to a public repository. Any external paid provider
@@ -185,7 +196,7 @@ space and has a size limit for very long books; future chapter batching may
 address this. Avoid running simultaneous renders with the same output folder.
 
 For implementation and acceptance details, see
-[docs/m5_notes.md](docs/m5_notes.md), [docs/m4_notes.md](docs/m4_notes.md),
+[docs/m6_release.md](docs/m6_release.md), [docs/m5_notes.md](docs/m5_notes.md), [docs/m4_notes.md](docs/m4_notes.md),
 [docs/text_format.md](docs/text_format.md), and
 [docs/roadmap.md](docs/roadmap.md).
 

@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "voxbraid"
-version = "0.0.6"
-description = "A modular, multi-voice TXT-to-audio toolkit (M5 one-command render and configuration)"
+version = "0.0.7"
+description = "A modular, multi-voice TXT-to-audio toolkit"
 readme = "README.md"
 requires-python = ">=3.10"
 keywords = ["text-to-speech", "audiobooks", "multi-voice"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
