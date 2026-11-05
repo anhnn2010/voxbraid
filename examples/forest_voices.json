@@ -1,0 +1,17 @@
+{
+  "narrator": {
+    "provider": "edge",
+    "voice": "en-US-BrianNeural",
+    "options": {"rate": "-10%"}
+  },
+  "fox": {
+    "provider": "edge",
+    "voice": "en-US-AndrewNeural",
+    "options": {"rate": "-10%"}
+  },
+  "bird": {
+    "provider": "edge",
+    "voice": "en-US-AvaNeural",
+    "options": {"rate": "-10%"}
+  }
+}

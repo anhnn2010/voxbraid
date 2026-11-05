@@ -1,7 +1,8 @@
-# M1 TXT input format and preview rules
+# TXT input format and preview/synthesis rules
 
 VoxBraid only accepts **UTF-8 TXT**, including UTF-8 BOM and Windows line endings.
-M1 only creates an **offline plan**, not audio.
+`preview` creates an **offline plan**. M2 `synthesize` writes separate audio
+clips and a manifest, but does not yet compose one audiobook.
 
 ## Plain text
 
@@ -47,7 +48,7 @@ Then he calls:
 - `[role]` is a separate line; names are case insensitive and use letters,
   numbers, `_`, `-`, starting with a letter (`[old_witch]`, `[little-bee]`).
 - Any role name is valid; M1 doesn't constrain it to an existing voice list.
-  Voice configuration is implemented in a later milestone.
+  M2 selects a voice for each role using a JSON file (`--voices`).
 - `[narrator:tag]` marks attribution, such as `she said.`; `[narrator:lead]`
   marks narration introducing an immediately following quote.
 - `:tag` and `:lead` are reserved for `narrator` and help plan short pauses.
@@ -99,3 +100,19 @@ Pause settings can be overridden by CLI flags in `voxbraid preview --help`.
 `voxbraid preview` reports the original TXT line numbers (`L6`, `L6-7`), role,
 paragraph index, pause type and seconds. `--json` emits the same segment data.
 No TTS engine, credentials, internet, model download or audio tool is required.
+
+## M2 voice selection
+
+The role names `[narrator]`, `[witch]`, etc. are mapped independently in a
+JSON file, for example:
+
+```json
+{
+  "narrator": {"provider":"edge", "voice":"en-US-BrianNeural", "options":{"rate":"-10%"}},
+  "witch": {"provider":"edge", "voice":"en-US-EmmaNeural", "options":{"rate":"-10%"}}
+}
+```
+
+If no voice file is supplied, only `narrator` has a default (Brian, -10%).
+A missing non-narrator role is an error, not an implicit narrator fallback.
+Pause metadata in the manifest is **planned only**; actual silence is M4.

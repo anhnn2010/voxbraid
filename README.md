@@ -2,23 +2,28 @@
 
 **Weave voices into stories.**
 
-VoxBraid is a modular TXT-to-audio project with multi-character narration and future
-per-character TTS providers. Only **prepared UTF-8 TXT** belongs in this repository.
-OCR, PDF/EPUB extraction, text cleanup and AI speaker identification are separate
-upstream tasks.
+VoxBraid is a modular, multi-voice **prepared TXT -> audio** toolkit. It does
+not extract PDFs/EPUBs, run OCR, clean book text, or infer speakers with AI.
+Those tasks happen before VoxBraid. A single book may assign different TTS
+providers to different roles; **M2 includes only the Edge TTS adapter**.
 
-> **M1 checkpoint — v0.0.2.** `voxbraid preview` parses TXT, identifies sentence and
-> paragraph boundaries, labels roles, and plans pauses **fully offline**. The `render`
-> command is **not implemented yet**; audio generation starts in a later milestone.
+> **M2 checkpoint — v0.0.3.** `preview` works offline; `synthesize` creates
+> separate per-segment speech clips plus `manifest.json` with roles, voices,
+> text and *planned* pauses. **It does not yet join clips into one audiobook,
+> add actual silence, mix music, retry socket errors, or resume from cache.**
+> Those are reserved for M3/M4. Do not mistake the per-clip output for a
+> completed audiobook.
 
-## Install and test (Arch Linux + pyenv)
+## Install / update on Arch Linux (pyenv)
 
-In your existing `voxbraid` repository and pyenv environment:
+Extract the **M2 update ZIP at the root of the existing M1 git repository**;
+it replaces only source/tests/docs, not `.git`, `.python-version`, or private
+`local_samples/`. Use your existing `voxbraid` pyenv environment:
 
 ```bash
 cd ~/Downloads/projects/voxbraid
 pyenv version
-python -m pip install -e '.[dev]'
+python -m pip install -e '.[dev,edge]'
 pyenv rehash
 voxbraid --version
 voxbraid doctor
@@ -26,87 +31,130 @@ python -m pytest -q
 python -m ruff check .
 ```
 
-If you are **updating from M0**, extract the M1 update ZIP at the **root of the
-existing repository**. It adds or replaces only project code, tests and documentation.
-It does not touch `.git`, `.python-version`, your virtual environment or ignored
-`local_samples/`.
+Python 3.10+ is supported; Arch Linux and Windows should work. `edge-tts` is
+installed by the optional `[edge]` extra; the core package and offline preview
+do not require it. `ffmpeg` is **not needed for M2 synthesis**, but will be used
+by the M4 composer. Since Edge TTS calls an online Microsoft Edge speech
+service through a community library, it needs Internet access and can fail
+when the service/network is unavailable.
 
-On Windows, use a normal Python 3.10+ environment and the same `pip install -e ".[dev]"`.
+## M2: synthesize a short sample
 
-## M1 preview (no synthesis / no internet)
-
-Plain narration TXT:
-
-```bash
-voxbraid preview tests/fixtures/plain_story.txt
-```
-
-Tagged multiple-speaker TXT:
+Start with **our original, synthetic forest dialogue**, not a full book:
 
 ```bash
-voxbraid preview tests/fixtures/multivoice_story.txt
+voxbraid preview examples/forest_dialogue.txt --limit 12
+
+voxbraid synthesize examples/forest_dialogue.txt \
+  --voices examples/forest_voices.json \
+  --max-segments 8 \
+  --out-dir local_samples/forest_m2
 ```
 
-The original Rapunzel demo from M0 (if kept under `local_samples/`):
+You will get `segment_0001.mp3`, `segment_0002.mp3`, etc. and a `manifest.json`.
+Each clip can be played separately with `mpv local_samples/forest_m2/segment_0001.mp3`
+(or another audio player). The manifest preserves the clip order and metadata.
+The planned pauses are **not inserted into the audio yet**.
+
+To test the legacy Rapunzel source retained locally from M0:
 
 ```bash
-voxbraid preview local_samples/rapunzel_legacy/rapunzel_dialogue.txt --limit 20
+voxbraid synthesize \
+  local_samples/rapunzel_legacy/rapunzel_dialogue.txt \
+  --voices examples/rapunzel_voices.template.json \
+  --max-segments 8 \
+  --out-dir local_samples/rapunzel_m2
 ```
 
-The M1 planner produces 77 segments from that Rapunzel source; it does **not**
-produce audio or call any provider. The count is a regression check, not a guarantee
-of perfect sentence detection for arbitrary texts.
+**Do not generate all 77 clips yet unless you want to**: this milestone has no
+retry or resume, so a socket error can interrupt the run. The private Rapunzel
+TXT and its legacy script are **not included in the M2 update ZIP** and must
+stay under the Git-ignored `local_samples/` directory.
 
-Tune pause settings without modifying the TXT:
+On a repeat run, VoxBraid refuses to overwrite existing clips unless you
+specify `--overwrite`, or select a new `--out-dir`. M3 will replace this simple
+safety rule with automatic content-based caching and resume. For example:
 
 ```bash
-voxbraid preview tests/fixtures/plain_story.txt \
-  --intro 3 \
-  --sentence-gap 1.5 \
-  --paragraph-gap 3 \
-  --speaker-gap 1 \
-  --attribution-gap 0.4 \
-  --lead-gap 0.6
+voxbraid synthesize examples/forest_dialogue.txt \
+  --voices examples/forest_voices.json \
+  --out-dir local_samples/forest_m2 \
+  --overwrite
 ```
 
-Export a machine-readable preview for inspection:
+### Plain TXT
 
 ```bash
-voxbraid preview tests/fixtures/multivoice_story.txt --json
+voxbraid synthesize tests/fixtures/plain_story.txt \
+  --max-segments 2 \
+  --out-dir local_samples/plain_m2
 ```
 
-See [the input format specification](docs/text_format.md) for role markers,
-paragraph conventions, pause precedence, quote handling and limitations.
+Without a voice file, plain TXT uses default narrator `en-US-BrianNeural`
+with rate `-10%`. Tagged text requires an explicit voice for **every role**;
+VoxBraid will not silently read an undefined character in the narrator's
+voice.
 
-## Repository scope and structure
+## Voice files and provider routing
 
-```text
-src/voxbraid/
-    cli.py          Preview/doctor entry point
-    parser.py       TXT and role parsing
-    models.py       Provider-independent document and segment models
-    planner.py      Sentence splitting and pause planning
-    diagnostics.py  External tool checks
+M2 uses **JSON (standard library)** for voice profiles; YAML/presets will come
+in M5. The role tags in TXT are unchanged from M1. Example:
 
-tests/              Offline pytest regression suite
-tests/fixtures/     Original synthetic test data
-docs/roadmap.md     Milestone plan and checkpoint log
-docs/text_format.md User-facing TXT rules
-local_samples/      Git-ignored legacy demo kept for local listening comparison
+```json
+{
+  "narrator": {"provider": "edge", "voice": "en-US-BrianNeural", "options": {"rate": "-10%"}},
+  "prince": {"provider": "edge", "voice": "en-US-AndrewNeural", "options": {"rate": "-10%"}},
+  "witch": {"provider": "edge", "voice": "en-US-EmmaNeural", "options": {"rate": "-10%"}},
+  "rapunzel": {"provider": "edge", "voice": "en-US-AvaNeural", "options": {"rate": "-10%"}}
+}
 ```
 
-**Future:** M2 provider abstraction + Edge TTS, M3 retry/resume/cache, M4 audio
-composer with music, M5 configuration and CLI polishing, M6 integration and release.
-Optional providers such as Kokoro/ElevenLabs will not be compulsory dependencies.
+Edge supports `rate`, `pitch` and `volume` as strings compatible with the
+`edge-tts` Python API. Different providers can have different options; the
+core will not assume every provider supports the same parameters. **Other
+provider IDs such as `kokoro` and `elevenlabs` do not work yet**: only an
+adapter implementation registered in the runtime can be used.
 
-`local_samples/` is intentionally excluded from Git: do not accidentally publish
-full book text or personal audio. Audio caches and generated MP3 files are also ignored.
+Internally, each provider declares its native audio extension (currently
+`.mp3` for Edge, potentially `.wav` for future local providers). M4 will
+normalize and mix different formats to one final MP3. The test suite uses
+fake providers to prove mixed-provider routing without installing GPU models
+or using paid APIs.
 
-## Development
+## Commands
+
+```bash
+voxbraid --help
+voxbraid doctor
+voxbraid preview examples/forest_dialogue.txt --json
+voxbraid synthesize --help
+```
+
+## Scope / roadmap
+
+- **M0:** Python foundation and offline tests.
+- **M1:** TXT parser, role markers, sentence/paragraph segmentation, preview.
+- **M2 (this release):** provider protocol and registry, Edge TTS adapter,
+  per-role voice JSON, per-segment synthesis and manifest.
+- **M3:** retry/backoff, validated content-addressed cache, auto resume.
+- **M4:** actual pauses, WAV normalization, voice mixing, music/loop/fade,
+  single final audiobook.
+- **M5:** user presets, YAML, refined stable `render` CLI, optional providers.
+- **M6:** Arch/Windows integration tests, docs, release readiness.
+
+See [M2 implementation notes](docs/m2_notes.md),
+[TXT syntax](docs/text_format.md), and [full roadmap](docs/roadmap.md).
+
+## Development and privacy
 
 ```bash
 python -m pytest -q
 python -m ruff check .
 ```
 
-**License:** not selected yet. Decide before making the repository public.
+The unit tests run without Internet or Edge TTS by using fake providers. The
+real Edge TTS smoke test is **manual on your Arch machine**; it is not run by
+CI. Keep commercial/copyrighted story TXT, generated MP3s, API credentials and
+local listening assets under `local_samples/`, which is ignored by Git.
+
+**License:** not selected; decide before publishing as an open-source project.

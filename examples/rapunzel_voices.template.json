@@ -1,0 +1,6 @@
+{
+  "narrator": {"provider": "edge", "voice": "en-US-BrianNeural", "options": {"rate": "-10%"}},
+  "witch": {"provider": "edge", "voice": "en-US-EmmaNeural", "options": {"rate": "-10%"}},
+  "prince": {"provider": "edge", "voice": "en-US-AndrewNeural", "options": {"rate": "-10%"}},
+  "rapunzel": {"provider": "edge", "voice": "en-US-AvaNeural", "options": {"rate": "-10%"}}
+}

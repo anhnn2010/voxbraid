@@ -75,10 +75,7 @@ def parse_text(text: str) -> Document:
         )
         collected.clear()
 
-    # for line_no, (raw, marker) in enumerate(zip(lines, markers), 1):
-    for line_no, (raw, marker) in enumerate(
-        zip(lines, markers, strict=True), 1
-    ):
+    for line_no, (raw, marker) in enumerate(zip(lines, markers, strict=True), 1):
         line = raw.strip()
         if marker is not None:
             flush()

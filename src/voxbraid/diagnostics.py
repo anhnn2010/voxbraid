@@ -28,11 +28,16 @@ def collect_diagnostics() -> list[Diagnostic]:
     ]
     for program in ("ffmpeg", "ffprobe", "edge-tts"):
         resolved = shutil.which(program)
+        missing_detail = (
+            'not found; install with python -m pip install -e ".[edge]"'
+            if program == "edge-tts"
+            else "not found on PATH (needed for M4 audio composition)"
+        )
         results.append(
             Diagnostic(
                 name=program,
                 available=bool(resolved),
-                detail=resolved or "not found on PATH (optional at M0)",
+                detail=resolved or missing_detail,
             )
         )
     return results

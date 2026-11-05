@@ -1,3 +1,3 @@
-"""VoxBraid: prepared TXT to multi-voice audiobook (M1 text planning)."""
+"""VoxBraid: modular prepared-TXT-to-audio engine (M2 speech clips)."""
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"

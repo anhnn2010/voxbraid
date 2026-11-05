@@ -17,6 +17,8 @@ htmlcov/
 local_samples/
 
 # Generated / private audio assets
+outputs/
+speech_clips/
 *.mp3
 *.m4b
 *.wav
@@ -28,4 +30,3 @@ local_samples/
 .env
 .env.*
 !.env.example
-.idea/

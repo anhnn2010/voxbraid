@@ -15,7 +15,7 @@
 - Rapunzel legacy script and source under git-ignored `local_samples/`.
 - M0 package version: `0.0.1`.
 
-## M1 — TXT parser & segment planner (delivered; awaiting user's Arch verification)
+## M1 — TXT parser & segment planner (Arch: 51 tests and Ruff checked after B905 fix)
 
 - Plain TXT, `[role]`, `[narrator:tag]`, `[narrator:lead]`.
 - Blank lines delimit paragraphs; wrapped lines remain in the same paragraph.
@@ -40,12 +40,15 @@ python -m pytest -q
 python -m ruff check .
 ```
 
-## M2 — Provider abstraction + Edge TTS
+## M2 — Provider abstraction + Edge TTS (delivered; awaiting Arch smoke test)
 
 - Provider protocol + per-role profile (`provider`, `voice`, provider-specific options).
 - First implementation: Edge; user-preferred voices Brian, Andrew, Emma, Ava.
-- Test doubles to exercise mixed-provider routing without heavy dependencies.
-- Render a short multi-voice sample; no music yet.
+- JSON voice mapping (YAML planned for M5), fake-provider regression tests.
+- Per-segment native audio output and manifest via `voxbraid synthesize`.
+- No physical pauses, final MP3, music, retry, resume or cache yet.
+- M2 package version `0.0.3` (manual Edge smoke test still required).
+
 
 ## M3 — Reliability
 
@@ -82,3 +85,5 @@ python -m ruff check .
 - 2026-11-04: Start with one Edge adapter, avoid installing PyTorch/BookNLP.
 - 2026-11-04: Rapunzel baseline was satisfactory; keep it for local regression.
 - 2026-11-04: M1: only offline parsing/planning; no premature `render` command.
+
+- 2026-11-04: M2: voice profiles may route each character to different providers.
