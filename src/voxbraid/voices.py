@@ -1,8 +1,10 @@
-"""Read provider-independent speaker-to-voice mapping from JSON (M2)."""
+"""Read provider-independent speaker-to-voice mappings from JSON or YAML."""
 
 from __future__ import annotations
 
 import json
+
+import yaml
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +43,18 @@ def _parse_profile(role: str, obj: Any) -> VoiceProfile:
     return VoiceProfile(provider=provider.strip(), voice=voice.strip(), options=options)
 
 
+def parse_voice_mapping(data: Any) -> dict[str, VoiceProfile]:
+    """Validate a role-to-profile mapping, shared by JSON/YAML and book config."""
+    if not isinstance(data, dict) or not data:
+        raise VoiceConfigError("Voice config must be a nonempty role-to-profile mapping")
+    profiles: dict[str, VoiceProfile] = {}
+    for role, definition in data.items():
+        if not isinstance(role, str) or not role or role.lower() != role:
+            raise VoiceConfigError("Voice role keys must be nonempty lowercase strings")
+        profiles[role] = _parse_profile(role, definition)
+    return profiles
+
+
 def load_voices(path: Path | None) -> dict[str, VoiceProfile]:
     """Return explicit mapping; without a file only narrator receives a default.
 
@@ -49,15 +63,13 @@ def load_voices(path: Path | None) -> dict[str, VoiceProfile]:
     """
     if path is None:
         return {"narrator": DEFAULT_NARRATOR}
+    if path.suffix.lower() not in {".json", ".yaml", ".yml"}:
+        raise VoiceConfigError(f"Voice config must end in .json, .yaml or .yml: {path}")
     try:
-        data = json.loads(path.read_text(encoding="utf-8-sig"))
-    except json.JSONDecodeError as exc:
-        raise VoiceConfigError(f"Invalid JSON voice file {path}: {exc}") from exc
-    if not isinstance(data, dict) or not data:
-        raise VoiceConfigError("Voice config must be a nonempty role-to-profile JSON object")
-    profiles: dict[str, VoiceProfile] = {}
-    for role, definition in data.items():
-        if not isinstance(role, str) or not role or role.lower() != role:
-            raise VoiceConfigError("Voice role keys must be nonempty lowercase strings")
-        profiles[role] = _parse_profile(role, definition)
-    return profiles
+        contents = path.read_text(encoding="utf-8-sig")
+        data = (json.loads(contents) if path.suffix.lower() == ".json"
+                else yaml.safe_load(contents))
+    except (OSError, UnicodeError, json.JSONDecodeError, yaml.YAMLError) as exc:
+        format_label = "JSON" if path.suffix.lower() == ".json" else "YAML"
+        raise VoiceConfigError(f"Invalid {format_label} voice config {path}: {exc}") from exc
+    return parse_voice_mapping(data)

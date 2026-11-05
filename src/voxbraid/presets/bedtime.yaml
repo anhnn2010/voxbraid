@@ -1,0 +1,17 @@
+# VoxBraid built-in bedtime preset. Does not choose music automatically.
+version: 1
+pauses:
+  intro: 3.0
+  sentence: 1.5
+  paragraph: 3.0
+  speaker: 1.0
+  attribution: 0.4
+  lead: 0.6
+music:
+  volume: 0.04
+  fade_in: 2.0
+  fade_out: 5.0
+retry:
+  retries: 4
+  base_delay: 2.0
+  max_delay: 30.0

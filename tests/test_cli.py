@@ -11,7 +11,7 @@ from voxbraid.diagnostics import Diagnostic, collect_diagnostics
 
 
 def test_version_is_semverish() -> None:
-    assert __version__ == "0.0.5"
+    assert __version__ == "0.0.6"
 
 
 def test_help_works_without_tts(capsys: pytest.CaptureFixture[str]) -> None:
@@ -21,7 +21,7 @@ def test_help_works_without_tts(capsys: pytest.CaptureFixture[str]) -> None:
     output = capsys.readouterr().out
     assert "voxbraid" in output
     assert "doctor" in output
-    assert "    render " not in output
+    assert "    render " in output
     assert "synthesize" in output
     assert "preview" in output
 
@@ -51,7 +51,7 @@ def test_diagnostics_are_strictly_read_only(monkeypatch: pytest.MonkeyPatch) -> 
     assert all(not item.available for item in checks[1:])
 
 
-def test_render_is_not_fake_or_premature() -> None:
+def test_render_requires_explicit_output() -> None:
     with pytest.raises(SystemExit) as exc:
         main(["render", "story.txt"])
     assert exc.value.code == 2
@@ -64,4 +64,4 @@ def test_module_invocation() -> None:
         capture_output=True,
         text=True,
     )
-    assert "voxbraid 0.0.5" in result.stdout
+    assert "voxbraid 0.0.6" in result.stdout

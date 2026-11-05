@@ -73,11 +73,18 @@ python -m ruff check .
 - Automated offline FFmpeg integration tests; Arch listening regression remains.
 
 
-## M5 — Configuration and CLI
+## M5 — Configuration and CLI (implemented; pending Arch acceptance)
 
-- YAML voice profiles with provider per character; optional dependencies.
-- Presets and friendly validation errors; stable `preview`/`render` interface.
-- Document cost implications; never silently use paid provider as fallback.
+- Version `0.0.6`, `voxbraid render FILE.txt -o book.mp3` composes existing
+  M3 synthesis and M4 audio rendering in one command.
+- `--preset bedtime` (installed package resource), `--config book.yaml`,
+  standalone YAML/JSON `--voices` with provider per character.
+- Explicit precedence: defaults < preset < book config < CLI flags; strict
+  YAML/JSON validation and no silent paid-provider fallback.
+- `render --dry-run` validates roles/providers offline; default speech clip
+  directory `book.voxbraid`, reusing verified M3 resume/cache.
+- `--music` file/folder and `--music-seed` retain M4 behavior and gain `0.04`.
+- PyYAML is a small required core dependency. Edge is still an optional adapter.
 
 ## M6 — Integration and packaging
 
@@ -100,3 +107,5 @@ python -m ruff check .
 - 2026-11-05: M3 separates complete manifest from incremental per-clip checkpoint; FFmpeg/FFprobe required for validation.
 
 - 2026-11-05: M4 directory music chooses one random MP3 (non-recursive) and loops that track; an explicit file never randomizes.
+
+- 2026-11-05: M5 adds one-command render, installed bedtime preset, YAML/JSON book configuration.

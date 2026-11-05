@@ -1,4 +1,4 @@
-"""VoxBraid CLI: prepare, synthesize and compose offline audiobook tracks."""
+"""VoxBraid CLI: prepare, synthesize, compose and one-command render."""
 
 from __future__ import annotations
 
@@ -15,12 +15,13 @@ from voxbraid.diagnostics import collect_diagnostics
 from voxbraid.parser import TextFormatError, parse_file
 from voxbraid.planner import PauseOptions, plan_segments
 from voxbraid.retry import RetryPolicy
-from voxbraid.synthesis import synthesize_segments
+from voxbraid.settings import SettingsError, load_render_settings
+from voxbraid.synthesis import _prepare, synthesize_segments
 from voxbraid.tts.registry import default_registry
 from voxbraid.voices import VoiceConfigError, load_voices
 
 
-def _pause_arguments(command: argparse.ArgumentParser) -> None:
+def _pause_arguments(command: argparse.ArgumentParser, *, explicit_only: bool = False) -> None:
     for arg, default, help_text in (
         ("intro", 3.0, "Initial silence (seconds)"),
         ("sentence", 1.5, "Pause between sentences in one paragraph"),
@@ -30,7 +31,9 @@ def _pause_arguments(command: argparse.ArgumentParser) -> None:
         ("lead", 0.6, "Pause after a [narrator:lead]"),
     ):
         flag = f"--{arg}-gap" if arg != "intro" else "--intro"
-        command.add_argument(flag, type=float, default=default, help=help_text)
+        command.add_argument(
+            flag, type=float, default=None if explicit_only else default, help=help_text
+        )
 
 
 def _options(args: argparse.Namespace) -> PauseOptions:
@@ -125,7 +128,100 @@ def build_parser() -> argparse.ArgumentParser:
         flag = "--intro" if kind == "intro" else f"--{kind}-gap"
         compose.add_argument(flag, type=float, default=None,
                              help=f"Override {kind} pause, in seconds")
+    render = subcommands.add_parser(
+        "render", help="Render prepared TXT to one MP3 (synthesize + compose).",
+    )
+    render.add_argument("input", type=Path, help="Prepared UTF-8 TXT file")
+    render.add_argument("-o", "--output", type=Path, required=True, help="Final audiobook MP3")
+    render.add_argument("--preset", help="Built-in 'bedtime' or path to YAML/JSON preset")
+    render.add_argument("--config", type=Path, help="Book YAML/JSON configuration")
+    render.add_argument("--voices", type=Path, help="Override all voice profiles from JSON/YAML")
+    render.add_argument("--out-dir", type=Path, help="Reusable speech clips directory")
+    render.add_argument("--cache-dir", type=Path, help="Shared TTS cache directory")
+    render.add_argument("--max-segments", type=int, help="Only first N speech segments (demo)")
+    render.add_argument("--overwrite", action="store_true", help="Re-synthesize every segment")
+    render.add_argument("--dry-run", action="store_true", help="Preview plan; no TTS or files")
+    render.add_argument("--retries", type=int, help="Retry transient synthesis failures N times")
+    render.add_argument("--retry-base-delay", type=float, help="Initial retry delay in seconds")
+    render.add_argument("--retry-max-delay", type=float, help="Maximum retry delay in seconds")
+    music_selector = render.add_mutually_exclusive_group()
+    music_selector.add_argument("--music", type=Path, help="MP3 or folder to select random MP3")
+    music_selector.add_argument("--no-music", action="store_true", help="Ignore configured music")
+    render.add_argument("--music-seed", type=int, help="Stable music selection from a folder")
+    render.add_argument("--music-volume", type=float, help="Background music gain (0..1)")
+    render.add_argument("--fade-in", type=float, help="Music fade-in seconds")
+    render.add_argument("--fade-out", type=float, help="Music fade-out seconds")
+    render.add_argument("--speech-output", type=Path, help="Also write a speech-only MP3")
+    _pause_arguments(render, explicit_only=True)
     return parser
+
+
+def _render(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    if args.max_segments is not None and args.max_segments < 1:
+        parser.error("--max-segments must be a positive integer")
+    if args.output.suffix.lower() != ".mp3":
+        parser.error("--output must have .mp3 extension")
+    override = {
+        **{name: getattr(args, name if name == "intro" else f"{name}_gap")
+           for name in ("intro", "sentence", "paragraph", "speaker", "attribution", "lead")},
+        "music_source": args.music,
+        "no_music": args.no_music,
+        "music_seed": args.music_seed,
+        "music_volume": args.music_volume,
+        "fade_in": args.fade_in,
+        "fade_out": args.fade_out,
+        "retries": args.retries,
+        "retry_base_delay": args.retry_base_delay,
+        "retry_max_delay": args.retry_max_delay,
+    }
+    try:
+        settings = load_render_settings(
+            preset=args.preset, config=args.config, voices=args.voices, overrides=override,
+        )
+        if args.speech_output is not None and settings.music.source is None:
+            raise SettingsError("--speech-output requires background music")
+        doc = parse_file(args.input)
+        segments = plan_segments(doc, settings.pauses)
+        selected = segments[:args.max_segments] if args.max_segments is not None else segments
+        output_dir = (args.out_dir if args.out_dir is not None
+                      else args.output.with_suffix(".voxbraid"))
+        registry = default_registry()
+        # Validate role mappings, provider-specific settings, and extensions before
+        # any output directory is created or any remote TTS call is attempted.
+        _prepare(selected, settings.voices, output_dir, registry)
+        if args.dry_run:
+            print(f"Plan: {doc.mode} TXT | {len(doc.paragraphs)} paragraphs | "
+                  f"{len(selected)} segments")
+            print(f"Audio: {args.output} | Speech clips: {output_dir}")
+            for role in sorted({seg.role for seg in selected}):
+                profile = settings.voices[role]
+                print(f"[{role}] {profile.provider}:{profile.voice}")
+            print(f"Music: {settings.music.source or 'none'}")
+            print("Dry run only — no TTS call, audio files or directories created.")
+            return 0
+        speech = asyncio.run(synthesize_segments(
+            selected, settings.voices, output_dir, registry,
+            overwrite=args.overwrite, cache_dir=args.cache_dir, retry_policy=settings.retry,
+        ))
+        music = settings.music
+        composition = compose_audiobook(
+            speech.manifest, args.output,
+            music_source=music.source, music_seed=music.seed,
+            music_volume=music.volume, fade_in=music.fade_in,
+            fade_out=music.fade_out, speech_output=args.speech_output,
+        )
+    except (OSError, UnicodeError, TextFormatError, VoiceConfigError, SettingsError,
+            ValueError, RuntimeError) as exc:
+        parser.error(str(exc))
+    print(f"Rendered {composition.segments} clips -> {composition.output}")
+    print(f"New: {speech.generated} | Cache: {speech.cached} | "
+          f"Resumed: {speech.resumed} | Retries: {speech.retried}")
+    print(f"Music: {composition.music if composition.music else 'none'}")
+    print(f"Speech clips: {speech.output_dir}")
+    print(f"Composition metadata: {composition.metadata}")
+    if composition.speech_output:
+        print(f"Speech-only: {composition.speech_output}")
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -135,8 +231,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         for check in collect_diagnostics():
             status = "OK" if check.available else "MISSING"
             print(f"[{status}] {check.name}: {check.detail}")
-        print("M4: compose manifest audio offline; Edge TTS is only needed for synthesize.")
+        print("M5: render TXT -> MP3; compose remains offline.")
         return 0
+    if args.command == "render":
+        return _render(args, parser)
     if args.command in {"preview", "synthesize"}:
         if args.command == "preview" and args.limit is not None and args.limit < 1:
             parser.error("--limit must be a positive integer")

@@ -21,6 +21,7 @@ local_samples/
 manifest.json
 
 # Generated / private audio assets
+*.voxbraid/
 outputs/
 speech_clips/
 *.mp3
