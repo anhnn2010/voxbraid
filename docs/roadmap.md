@@ -40,22 +40,25 @@ python -m pytest -q
 python -m ruff check .
 ```
 
-## M2 — Provider abstraction + Edge TTS (delivered; awaiting Arch smoke test)
+## M2 — Provider abstraction + Edge TTS (verified on Arch)
 
 - Provider protocol + per-role profile (`provider`, `voice`, provider-specific options).
 - First implementation: Edge; user-preferred voices Brian, Andrew, Emma, Ava.
 - JSON voice mapping (YAML planned for M5), fake-provider regression tests.
 - Per-segment native audio output and manifest via `voxbraid synthesize`.
 - No physical pauses, final MP3, music, retry, resume or cache yet.
-- M2 package version `0.0.3` (manual Edge smoke test still required).
+- M2 package version `0.0.3`. User confirmed a successful live Edge synthesis of the forest dialogue on Arch Linux after an intermittent `NoAudioReceived` failure.
 
 
-## M3 — Reliability
+## M3 — Reliability (delivered; pending Arch acceptance)
 
-- Retry transient socket errors with exponential backoff, jitter and a bound.
-- Validate audio before atomically committing cached speech.
-- Resume interrupted jobs; cache key includes provider/model/voice/text/options.
-- Avoid re-running successful speech when another segment fails.
+- M3 package version `0.0.4`.
+- Retry transient socket/`NoAudioReceived`/HTTP 429/5xx errors; capped exponential backoff with jitter.
+- Validate audio via FFprobe and FFmpeg decoding before atomic cache commit.
+- Auto resume interrupted jobs via per-clip state and SHA-256 integrity checks.
+- Cache key includes provider/voice/text/options/extension/adapter version, not pauses or music.
+- Reuse audio across output directories via optional `--cache-dir`.
+- No live Edge TTS test in assistant runtime; validate M3 online on Arch Linux.
 
 ## M4 — Audio composer
 
@@ -87,3 +90,5 @@ python -m ruff check .
 - 2026-11-04: M1: only offline parsing/planning; no premature `render` command.
 
 - 2026-11-04: M2: voice profiles may route each character to different providers.
+
+- 2026-11-05: M3 separates complete manifest from incremental per-clip checkpoint; FFmpeg/FFprobe required for validation.

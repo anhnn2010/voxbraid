@@ -16,6 +16,10 @@ htmlcov/
 # Locally supplied story texts and original demo (do not publish by default)
 local_samples/
 
+# Generated per-run clip state and manifests may contain book metadata/text.
+.voxbraid_state.json
+manifest.json
+
 # Generated / private audio assets
 outputs/
 speech_clips/

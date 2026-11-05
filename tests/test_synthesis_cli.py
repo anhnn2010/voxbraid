@@ -62,6 +62,8 @@ def test_cli_synthesize_mock_provider_and_max_segments(
     registry = ProviderRegistry()
     registry.register("edge", FakeProvider())
     monkeypatch.setattr("voxbraid.cli.default_registry", lambda: registry)
+    monkeypatch.setattr("voxbraid.synthesis.check_audio_tools", lambda: None)
+    monkeypatch.setattr("voxbraid.synthesis.validate_audio", lambda path: 1.0)
     story = tmp_path / "story.txt"
     story.write_text("One day a fox arrived.\nThe bird looked up.")
     output_dir = tmp_path / "speech"
@@ -73,4 +75,4 @@ def test_cli_synthesize_mock_provider_and_max_segments(
     manifest = json.loads((output_dir / "manifest.json").read_text())
     assert len(manifest["segments"]) == 1
     assert manifest["segments"][0]["voice"] == "en-US-BrianNeural"
-    assert "Created 1 speech clips" in capsys.readouterr().out
+    assert "Completed 1 speech clips" in capsys.readouterr().out

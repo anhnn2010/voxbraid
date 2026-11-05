@@ -1,4 +1,4 @@
-"""VoxBraid CLI: offline preview and M2 per-segment speech synthesis."""
+"""VoxBraid CLI: offline preview and M3 resilient speech synthesis."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from voxbraid import __version__
 from voxbraid.diagnostics import collect_diagnostics
 from voxbraid.parser import TextFormatError, parse_file
 from voxbraid.planner import PauseOptions, plan_segments
+from voxbraid.retry import RetryPolicy
 from voxbraid.synthesis import synthesize_segments
 from voxbraid.tts.registry import default_registry
 from voxbraid.voices import VoiceConfigError, load_voices
@@ -72,7 +73,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-segments", type=int, help="Generate only the first N segments for a quick test"
     )
     synthesize.add_argument(
-        "--overwrite", action="store_true", help="Replace existing output clips (no resume in M2)"
+        "--overwrite", action="store_true", help="Force new synthesis and replace previous clips"
+    )
+    synthesize.add_argument(
+        "--cache-dir", type=Path, help="Shared cache path (default: <out-dir>/.voxbraid_cache)"
+    )
+    synthesize.add_argument(
+        "--retries", type=int, default=4, help="Retry temporary errors N times (default 4)"
+    )
+    synthesize.add_argument(
+        "--retry-base-delay", type=float, default=2.0,
+        help="Initial retry delay in seconds (default 2; exponential backoff)",
+    )
+    synthesize.add_argument(
+        "--retry-max-delay", type=float, default=30.0,
+        help="Maximum retry delay in seconds (default 30)",
     )
     _pause_arguments(synthesize)
     return parser
@@ -85,7 +100,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         for check in collect_diagnostics():
             status = "OK" if check.available else "MISSING"
             print(f"[{status}] {check.name}: {check.detail}")
-        print("M2: 'synthesize' creates speech clips; M4 will compose a single MP3.")
+        print("M3: resumable synthesis clips; M4 will compose a single MP3.")
         return 0
     if args.command in {"preview", "synthesize"}:
         if args.command == "preview" and args.limit is not None and args.limit < 1:
@@ -130,15 +145,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             segments[:args.max_segments] if args.max_segments is not None else segments
         )
         try:
+            policy = RetryPolicy(
+                retries=args.retries,
+                base_delay=args.retry_base_delay,
+                max_delay=args.retry_max_delay,
+            )
             profiles = load_voices(args.voices)
             result = asyncio.run(synthesize_segments(
-                selected, profiles, args.out_dir, default_registry(), overwrite=args.overwrite
+                selected, profiles, args.out_dir, default_registry(),
+                overwrite=args.overwrite, cache_dir=args.cache_dir, retry_policy=policy,
             ))
         except (OSError, UnicodeError, VoiceConfigError, ValueError, RuntimeError) as exc:
             parser.error(str(exc))
-        print(f"Created {len(result.clips)} speech clips in {result.output_dir}")
+        print(f"Completed {len(result.clips)} speech clips in {result.output_dir}")
+        print(f"New: {result.generated} | Cache: {result.cached} | "
+              f"Resumed: {result.resumed} | Retries: {result.retried}")
         print(f"Sequence and pause metadata: {result.manifest}")
-        print("M2: these are separate speech clips; pauses/music/full MP3 arrive in M4.")
+        print("M3: separate speech clips; pauses/music/full MP3 arrive in M4.")
         return 0
     parser.print_help()
     return 0

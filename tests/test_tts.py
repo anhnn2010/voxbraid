@@ -10,10 +10,19 @@ import pytest
 
 from voxbraid.parser import parse_text
 from voxbraid.planner import plan_segments
-from voxbraid.synthesis import SynthesisError, synthesize_segments
+from voxbraid.retry import RetryPolicy
+from voxbraid.synthesis import SynthesisError, synthesize_segments as real_synthesize_segments
 from voxbraid.tts.base import VoiceProfile
 from voxbraid.tts.edge import EdgeTTSProvider
 from voxbraid.tts.registry import ProviderRegistry, default_registry
+
+
+async def synthesize_segments(*args, **kwargs):
+    # Old M2 mocks deliberately emit non-audio bytes; M3 audio verification
+    # is covered separately by real WAV and MP3 tests.
+    kwargs.setdefault("validator", lambda _: 1.0)
+    kwargs.setdefault("retry_policy", RetryPolicy(retries=0))
+    return await real_synthesize_segments(*args, **kwargs)
 
 
 class FakeProvider:
@@ -101,8 +110,8 @@ def test_preflight_output_collision_requires_explicit_overwrite(tmp_path: Path, 
     profiles = {r: VoiceProfile("fake", r) for r in ("narrator", "fox", "bird")}
     output = tmp_path / "a"
     asyncio.run(synthesize_segments(story, profiles, output, registry))
-    with pytest.raises(FileExistsError, match="--overwrite"):
-        asyncio.run(synthesize_segments(story, profiles, output, registry))
+    resumed = asyncio.run(synthesize_segments(story, profiles, output, registry))
+    assert resumed.resumed == 3
     assert len(provider.calls) == 3
     asyncio.run(synthesize_segments(story[:1], profiles, output, registry, overwrite=True))
     assert len(provider.calls) == 4
