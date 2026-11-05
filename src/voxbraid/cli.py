@@ -1,4 +1,4 @@
-"""VoxBraid CLI: offline preview and M3 resilient speech synthesis."""
+"""VoxBraid CLI: prepare, synthesize and compose offline audiobook tracks."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from voxbraid import __version__
+from voxbraid.composer import PauseOverrides, compose_audiobook
 from voxbraid.diagnostics import collect_diagnostics
 from voxbraid.parser import TextFormatError, parse_file
 from voxbraid.planner import PauseOptions, plan_segments
@@ -46,7 +47,7 @@ def _options(args: argparse.Namespace) -> PauseOptions:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="voxbraid",
-        description="VoxBraid: prepare TXT narration and synthesize multi-voice speech clips.",
+        description="VoxBraid: plan TXT, synthesize speech clips, and compose audiobooks.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subcommands = parser.add_subparsers(dest="command", metavar="COMMAND")
@@ -60,7 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     synthesize = subcommands.add_parser(
         "synthesize",
-        help="Generate separate speech clips (no pauses or music yet; M4 joins them).",
+        help="Generate separately cached speech clips and manifest (M3).",
     )
     synthesize.add_argument("input", type=Path, help="Prepared UTF-8 TXT file")
     synthesize.add_argument(
@@ -90,6 +91,40 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum retry delay in seconds (default 30)",
     )
     _pause_arguments(synthesize)
+
+    compose = subcommands.add_parser(
+        "compose", help="Compose an M3 manifest into an MP3 (offline; never calls TTS)."
+    )
+    compose.add_argument("manifest", type=Path, help="Complete M3 manifest.json")
+    compose.add_argument("-o", "--output", type=Path, required=True, help="Final audiobook MP3")
+    compose.add_argument(
+        "--music", type=Path,
+        help="Specific MP3 file, or folder to randomly select one MP3 (no recursion)",
+    )
+    compose.add_argument(
+        "--music-seed", type=int,
+        help="Reproducible random selection when --music is a folder",
+    )
+    compose.add_argument(
+        "--music-volume", type=float, default=0.04,
+        help="Background music volume multiplier (0..1; default 0.04)",
+    )
+    compose.add_argument(
+        "--fade-in", type=float, default=2.0,
+        help="Music fade-in seconds (default 2)",
+    )
+    compose.add_argument(
+        "--fade-out", type=float, default=5.0,
+        help="Music fade-out seconds (default 5)",
+    )
+    compose.add_argument(
+        "--speech-output", type=Path,
+        help="Also export speech-only MP3 when mixing music",
+    )
+    for kind in ("intro", "sentence", "paragraph", "speaker", "attribution", "lead"):
+        flag = "--intro" if kind == "intro" else f"--{kind}-gap"
+        compose.add_argument(flag, type=float, default=None,
+                             help=f"Override {kind} pause, in seconds")
     return parser
 
 
@@ -100,7 +135,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         for check in collect_diagnostics():
             status = "OK" if check.available else "MISSING"
             print(f"[{status}] {check.name}: {check.detail}")
-        print("M3: resumable synthesis clips; M4 will compose a single MP3.")
+        print("M4: compose manifest audio offline; Edge TTS is only needed for synthesize.")
         return 0
     if args.command in {"preview", "synthesize"}:
         if args.command == "preview" and args.limit is not None and args.limit < 1:
@@ -161,7 +196,33 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"New: {result.generated} | Cache: {result.cached} | "
               f"Resumed: {result.resumed} | Retries: {result.retried}")
         print(f"Sequence and pause metadata: {result.manifest}")
-        print("M3: separate speech clips; pauses/music/full MP3 arrive in M4.")
+        print("To assemble an audiobook: voxbraid compose <out-dir>/manifest.json -o book.mp3")
+        return 0
+    if args.command == "compose":
+        try:
+            pauses = PauseOverrides(
+                intro=args.intro,
+                sentence=args.sentence_gap,
+                paragraph=args.paragraph_gap,
+                speaker=args.speaker_gap,
+                attribution=args.attribution_gap,
+                lead=args.lead_gap,
+            )
+            result = compose_audiobook(
+                args.manifest, args.output, pauses=pauses,
+                music_source=args.music, music_seed=args.music_seed,
+                music_volume=args.music_volume, fade_in=args.fade_in,
+                fade_out=args.fade_out, speech_output=args.speech_output,
+            )
+        except (OSError, UnicodeError, ValueError, RuntimeError) as exc:
+            parser.error(str(exc))
+        print(f"Composed {result.segments} speech clips -> {result.output}")
+        print(f"Audio duration: {result.duration:.2f}s | "
+              f"Speech timeline: {result.speech_duration:.2f}s")
+        print(f"Music: {result.music if result.music else 'none'}")
+        if result.speech_output is not None:
+            print(f"Speech-only: {result.speech_output}")
+        print(f"Composition metadata: {result.metadata}")
         return 0
     parser.print_help()
     return 0

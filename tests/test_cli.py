@@ -11,7 +11,7 @@ from voxbraid.diagnostics import Diagnostic, collect_diagnostics
 
 
 def test_version_is_semverish() -> None:
-    assert __version__ == "0.0.4"
+    assert __version__ == "0.0.5"
 
 
 def test_help_works_without_tts(capsys: pytest.CaptureFixture[str]) -> None:
@@ -64,4 +64,4 @@ def test_module_invocation() -> None:
         capture_output=True,
         text=True,
     )
-    assert "voxbraid 0.0.4" in result.stdout
+    assert "voxbraid 0.0.5" in result.stdout

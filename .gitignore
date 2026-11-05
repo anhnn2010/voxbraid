@@ -34,3 +34,6 @@ speech_clips/
 .env
 .env.*
 !.env.example
+
+# M4 composition metadata (can contain private local paths)
+*.compose.json

@@ -60,12 +60,18 @@ python -m ruff check .
 - Reuse audio across output directories via optional `--cache-dir`.
 - No live Edge TTS test in assistant runtime; validate M3 online on Arch Linux.
 
-## M4 — Audio composer
+## M4 — Audio composer (implemented; pending Arch acceptance)
 
-- Render distinct sentence, paragraph, speaker and attribution pauses.
-- Common PCM intermediate format and optional speech-only output.
-- Optional background music, loop, fade; no resynthesis for pause/music changes.
-- Compare Baroque volume baseline with original Rapunzel demo.
+- Version `0.0.5`, `voxbraid compose MANIFEST --output BOOK.mp3`.
+- Distinct sentence, paragraph, speaker and attribution pauses; override categories
+  at compose time, without re-synthesizing speech.
+- Validate clips and convert to streamed 48-kHz stereo PCM, one MP3 encode.
+- Optional MP3 background file or folder; choose one random folder track,
+  reproducible with `--music-seed`, loop/fade/limiter, baseline gain 0.04.
+- Optional speech-only export alongside the mixed audiobook.
+- Chosen track and settings recorded in `.compose.json`; file is Git-ignored.
+- Automated offline FFmpeg integration tests; Arch listening regression remains.
+
 
 ## M5 — Configuration and CLI
 
@@ -92,3 +98,5 @@ python -m ruff check .
 - 2026-11-04: M2: voice profiles may route each character to different providers.
 
 - 2026-11-05: M3 separates complete manifest from incremental per-clip checkpoint; FFmpeg/FFprobe required for validation.
+
+- 2026-11-05: M4 directory music chooses one random MP3 (non-recursive) and loops that track; an explicit file never randomizes.
